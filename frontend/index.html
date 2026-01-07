@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SeedWeb - Demo 3 Capas</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="config.js"></script> </head>
+<body class="bg-slate-100 text-slate-800 font-sans">
+
+    <nav class="bg-blue-600 text-white p-4 shadow-lg">
+        <div class="container mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold">Interfaz de registro</h1>
+            <span class="text-sm bg-blue-800 px-3 py-1 rounded-full">Capa 1: Presentación</span>
+        </div>
+    </nav>
+
+    <div class="container mx-auto mt-10 p-4 grid grid-cols-1 md:grid-cols-2 gap-8">
+        
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-blue-500">
+            <h2 class="text-2xl font-bold mb-4">Registrar Estudiante</h2>
+            <p class="text-gray-500 mb-6 text-sm">Estos datos viajarán a la Capa 2 (Python) y se guardarán en la Capa 3 (Postgres).</p>
+            
+            <form id="studentForm" class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Nombre Completo</label>
+                    <input type="text" id="nombre" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Ej. Juan Pérez" required>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700">Carrera / Facultad</label>
+                    <input type="text" id="carrera" class="mt-1 block w-full p-2 border border-gray-300 rounded-md focus:ring-blue-500 focus:border-blue-500" placeholder="Ej. Sistemas" required>
+                </div>
+                <button type="submit" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition duration-300 font-semibold shadow-md">
+                    Enviar a Capa 2 🚀
+                </button>
+            </form>
+            <div id="statusMessage" class="mt-4 text-center text-sm font-medium hidden"></div>
+        </div>
+
+        <div class="bg-white p-6 rounded-lg shadow-md border-t-4 border-green-500">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-2xl font-bold">Registros en Base de Datos</h2>
+                <button onclick="cargarEstudiantes()" class="text-sm text-blue-600 hover:underline">Actualizar</button>
+            </div>
+            
+            <div class="overflow-y-auto h-64 pr-2" id="studentsList">
+                <p class="text-gray-400 text-center mt-10">Cargando datos desde la Capa 3...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Referencias al DOM
+        const form = document.getElementById('studentForm');
+        const list = document.getElementById('studentsList');
+        const statusMsg = document.getElementById('statusMessage');
+
+        // 1. FUNCIÓN: Cargar datos (READ)
+        async function cargarEstudiantes() {
+            try {
+                // Usamos la variable de config.js
+                const res = await fetch(`${CONFIG.API_URL}/api/estudiantes`);
+                
+                if (!res.ok) throw new Error("Error conectando a Capa 2");
+                
+                const data = await res.json();
+                renderizarLista(data);
+            } catch (error) {
+                console.error(error);
+                list.innerHTML = `<div class="p-4 bg-red-100 text-red-700 rounded text-center">❌ Error de conexión: ${error.message}<br><small>Verifique que el Backend esté corriendo.</small></div>`;
+            }
+        }
+
+        // 2. FUNCIÓN: Renderizar HTML
+        function renderizarLista(estudiantes) {
+            if (estudiantes.length === 0) {
+                list.innerHTML = '<p class="text-gray-400 text-center mt-10">No hay registros aún.</p>';
+                return;
+            }
+
+            let html = '';
+            estudiantes.forEach(est => {
+                html += `
+                    <div class="flex justify-between items-center bg-gray-50 p-3 rounded mb-2 border-l-4 border-green-400 hover:bg-gray-100 transition">
+                        <div>
+                            <p class="font-bold text-gray-800">${est.nombre}</p>
+                            <p class="text-xs text-gray-500">${est.carrera}</p>
+                        </div>
+                        <span class="text-xs text-gray-400">ID: ${est.id}</span>
+                    </div>
+                `;
+            });
+            list.innerHTML = html;
+        }
+
+        // 3. FUNCIÓN: Enviar datos (CREATE)
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const nombre = document.getElementById('nombre').value;
+            const carrera = document.getElementById('carrera').value;
+            const btn = form.querySelector('button');
+
+            // Feedback visual
+            btn.disabled = true;
+            btn.innerHTML = "Procesando...";
+
+            try {
+                const res = await fetch(`${CONFIG.API_URL}/api/estudiantes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ nombre, carrera })
+                });
+
+                if (res.ok) {
+                    statusMsg.innerText = " Guardado exitosamente!";
+                    statusMsg.className = "mt-4 text-center text-sm font-medium text-green-600 block";
+                    form.reset();
+                    cargarEstudiantes(); // Recargar la lista automáticamente
+                } else {
+                    throw new Error("Error en respuesta");
+                }
+            } catch (error) {
+                statusMsg.innerText = " Error al guardar.";
+                statusMsg.className = "mt-4 text-center text-sm font-medium text-red-600 block";
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = "Enviar a Capa 2 ";
+                setTimeout(() => statusMsg.classList.add('hidden'), 3000);
+            }
+        });
+
+        // Cargar al inicio
+        cargarEstudiantes();
+    </script>
+</body>
+</html>
